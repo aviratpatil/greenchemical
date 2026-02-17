@@ -3,9 +3,10 @@ import { motion } from 'framer-motion';
 import SafetyGauge from './SafetyGauge';
 import IngredientBreakdown from './IngredientBreakdown';
 import { RefreshCw, AlertTriangle, Printer } from 'lucide-react';
+import RecommendationsCard from './RecommendationsCard';
 
 const ResultsView = ({ data, onReset }) => {
-    const { overall_safety_score, risk_level, key_concerns, ingredients_breakdown, missing_ingredients } = data;
+    const { overall_safety_score, risk_level, key_concerns, ingredients_breakdown, missing_ingredients, recommendations } = data;
 
     return (
         <motion.div
@@ -50,6 +51,13 @@ const ResultsView = ({ data, onReset }) => {
                 </div>
             </div>
 
+            {/* Recommendations Section */}
+            {recommendations && recommendations.length > 0 && (
+                <div className="mb-8">
+                    <RecommendationsCard recommendations={recommendations} />
+                </div>
+            )}
+
             {missing_ingredients && missing_ingredients.length > 0 && (
                 <div className="mb-6 bg-yellow-500/10 border border-yellow-500/20 p-4 rounded-xl flex items-center gap-3">
                     <AlertTriangle className="text-warning shrink-0" />
@@ -59,7 +67,11 @@ const ResultsView = ({ data, onReset }) => {
                 </div>
             )}
 
-            <IngredientBreakdown ingredients={ingredients_breakdown} />
+            <IngredientBreakdown
+                ingredients={ingredients_breakdown}
+                category={data.category}
+                targetAudience={data.target_audience}
+            />
 
             <div className="mt-8 flex justify-center gap-4">
                 <button

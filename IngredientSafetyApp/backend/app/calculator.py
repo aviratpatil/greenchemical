@@ -16,6 +16,8 @@ def calculate_safety_score(ingredients_list):
     total_weighted_hazard = 0
     max_possible_weighted_hazard = 0
     has_restricted = False
+    key_concerns = []
+
     for i,ing in enumerate(ingredients_list):
         # Determine Weight (Position based)
         if i < 5:
@@ -25,7 +27,43 @@ def calculate_safety_score(ingredients_list):
         else:
             weight = 1.0
 
-        h_score = ing.hazard_score if ing.hazard_score is not None else 5 # Default 5 if missing
+        # Extract score from JSON or fallback
+        # ing.scores might be a dict (if we pre-processed it) or JSON string
+        import json
+        try:
+            if isinstance(ing.scores, str):
+                scores = json.loads(ing.scores)
+            elif isinstance(ing.scores, dict):
+                scores = ing.scores
+            else:
+                scores = {}
+        except:
+            scores = {}
+            
+        # Get the max score from the detailed breakdown as the "Hazard Score"
+        # If empty or invalid, default to 5
+        if scores and isinstance(scores, dict):
+             # Filter out non-numeric values just in case
+            numeric_scores = [v for k,v in scores.items() if isinstance(v, (int, float))]
+            h_score = max(numeric_scores) if numeric_scores else 5
+        else:
+            h_score = 5
+
+        # Quantity Verification Logic
+        input_qty = getattr(ing, 'input_quantity', None)
+        max_limit = getattr(ing, 'max_percentage', None)
+        
+        if input_qty is not None and max_limit is not None:
+            if input_qty > max_limit:
+                h_score = 10 # Force max hazard
+                msg = f"Excessive {ing.name}: {input_qty}% (Limit: {max_limit}%)"
+                if msg not in key_concerns:
+                    key_concerns.append(msg)
+                # Attach validation message for UI
+                ing.quantity_validation = f"Exceeds regulation limit of {max_limit}%"
+            else:
+                ing.quantity_validation = f"Within safe limit ({max_limit}%)"
+
         
         # Check for restrictions
         if getattr(ing, "is_restricted", False):
