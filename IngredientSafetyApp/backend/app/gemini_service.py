@@ -83,6 +83,55 @@ def get_ingredient_details(ingredient_name, category="shampoo", target_audience=
     else:
         qty_context += f"**Analysis**: Please check if your product label specifies a concentration. If it exceeds {limit}%, it may be unsafe."
 
+    # Green Alternative Logic
+    green_alternatives = {
+        "retinol": {
+            "alt": "Bakuchiol",
+            "reason": "Plant-based, non-irritating, and biodegradable.",
+            "impact": "Lower carbon footprint in production."
+        },
+        "parabens": {
+            "alt": "Leuconostoc/Radish Root Ferment",
+            "reason": "Natural peptide preservative.",
+            "impact": "Non-toxic to marine life."
+        },
+        "sodium lauryl sulfate": {
+            "alt": "Coco-Glucoside",
+            "reason": "Derived from coconut and fruit sugars.",
+            "impact": "Fully biodegradable and mild."
+        },
+        "fragrance": {
+            "alt": "Essential Oils (Lavender/Chamomile)",
+            "reason": "Natural extraction.",
+            "impact": "Avoids synthetic VOC emissions."
+        },
+        "oxybenzone": {
+            "alt": "Zinc Oxide (Non-Nano)",
+            "reason": "Mineral blocker.",
+            "impact": "Reef-safe, does not bleach coral."
+        }
+    }
+    
+    green_context = ""
+    green_data = green_alternatives.get(name_lower)
+    
+    # We will return a special separator that the frontend can parse, or just append to markdown
+    # For this iteration, let's append a clearly marked section
+    
+    if green_data:
+        green_context = f"""
+## 🌱 Green Alternative: **{green_data['alt']}**
+*   **Why it's better**: {green_data['reason']}
+*   **Eco-Impact**: {green_data['impact']}
+*   **Recommendation**: Look for products containing {green_data['alt']} instead.
+"""
+    else:
+        green_context = f"""
+## 🌱 Green Alternative
+*   **Status**: No direct 1:1 natural substitute found in our database for *{ingredient_name}*.
+*   **Advice**: Reduce usage or look for "Clean Label" certifications.
+"""
+
     # Final Markdown Response
     response = f"""
 ## Analysis of **{ingredient_name}**
@@ -92,6 +141,8 @@ def get_ingredient_details(ingredient_name, category="shampoo", target_audience=
 
 {audience_context}
 {qty_context}
+
+{green_context}
 
 ---
 *Disclaimer: This is a generated summary for educational purposes.*

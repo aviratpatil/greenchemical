@@ -1,9 +1,21 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Sparkles, AlertTriangle, ShieldCheck, Info } from 'lucide-react';
+import { X, Sparkles, AlertTriangle, ShieldCheck, Info, Leaf } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
 const IngredientDetailModal = ({ isOpen, onClose, ingredient, details, isLoading }) => {
+    const scrollToGreen = () => {
+        // Find the Green Alternative section dynamically
+        const headings = document.querySelectorAll('h3'); // We map h2 to h3
+        for (const h of headings) {
+            if (h.textContent.includes('Green Alternative')) {
+                h.scrollIntoView({ behavior: 'smooth' });
+                h.classList.add('text-green-400'); // Dynamic highlight
+                break;
+            }
+        }
+    };
+
     if (!isOpen) return null;
 
     return (
@@ -37,12 +49,24 @@ const IngredientDetailModal = ({ isOpen, onClose, ingredient, details, isLoading
                                 <span className="text-sm text-gray-400">Concentration: {ingredient.input_quantity}%</span>
                             )}
                         </div>
-                        <button
-                            onClick={onClose}
-                            className="p-2 hover:bg-white/10 rounded-full transition-colors text-gray-400 hover:text-white"
-                        >
-                            <X className="w-5 h-5" />
-                        </button>
+                        <div className="flex items-center gap-2">
+                            {details && details.includes("Green Alternative") && (
+                                <button
+                                    onClick={scrollToGreen}
+                                    className="p-2 bg-green-500/20 text-green-400 rounded-full hover:bg-green-500/30 transition-colors flex items-center gap-2 px-3"
+                                    title="View Green Alternative"
+                                >
+                                    <Leaf className="w-4 h-4" />
+                                    <span className="text-xs font-bold hidden sm:inline">Green Alt</span>
+                                </button>
+                            )}
+                            <button
+                                onClick={onClose}
+                                className="p-2 hover:bg-white/10 rounded-full transition-colors text-gray-400 hover:text-white"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
                     </div>
 
                     {/* Body */}
@@ -56,11 +80,12 @@ const IngredientDetailModal = ({ isOpen, onClose, ingredient, details, isLoading
                             <div className="prose prose-invert prose-sm max-w-none">
                                 <ReactMarkdown
                                     components={{
-                                        h2: ({ node, ...props }) => <h3 className="text-xl font-semibold text-white mt-6 mb-3 flex items-center gap-2" {...props} />,
-                                        h3: ({ node, ...props }) => <h4 className="text-lg font-medium text-gray-200 mt-4 mb-2" {...props} />,
-                                        strong: ({ node, ...props }) => <span className="font-bold text-purple-300" {...props} />,
-                                        ul: ({ node, ...props }) => <ul className="list-disc pl-5 space-y-1 text-gray-300" {...props} />,
-                                        p: ({ node, ...props }) => <p className="text-gray-300 leading-relaxed mb-4" {...props} />,
+                                        // Simple component mapping to avoid crashes
+                                        h2: (props) => <h3 className="text-xl font-semibold text-white mt-6 mb-3 flex items-center gap-2" {...props} />,
+                                        h3: (props) => <h4 className="text-lg font-medium text-gray-200 mt-4 mb-2" {...props} />,
+                                        strong: (props) => <span className="font-bold text-purple-300" {...props} />,
+                                        ul: (props) => <ul className="list-disc pl-5 space-y-1 text-gray-300" {...props} />,
+                                        p: (props) => <p className="text-gray-300 leading-relaxed mb-4" {...props} />,
                                     }}
                                 >
                                     {details}
