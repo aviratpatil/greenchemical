@@ -1,150 +1,197 @@
-import random
+import json
+from .database import SessionLocal
+from .models import Ingredient
+import difflib
 
 def get_ingredient_details(ingredient_name, category="shampoo", target_audience="adult", quantity=None):
     """
-    Mock function to simulate Gemini API response.
-    Returns markdown formatted text.
+    Fetches comprehensive ingredient details directly from the newly uploaded dataset
+    stored in the SQLite database and formats it into rich Markdown.
     """
+    db = SessionLocal()
     
-    # Generic templates based on safety
-    safe_templates = [
-        "is generally considered **safe** for use in cosmetics.",
-        "is a common and well-tolerated ingredient.",
-        "has a long history of safe use in personal care products."
-    ]
-    
-    caution_templates = [
-        "should be used with **caution**.",
-        "may cause irritation in sensitive individuals.",
-        "has some regulatory restrictions due to potential sensitization."
-    ]
-    
-    unsafe_templates = [
-        "is **not recommended**, especially for sensitive groups.",
-        "has been linked to potential health concerns.",
-        "is restricted in many regions due to safety risks."
-    ]
-    
-    # Simple keyword-based logic for the mock
-    name_lower = ingredient_name.lower()
-    
-    if any(x in name_lower for x in ['water', 'aqua', 'extract', 'oil', 'glycerin']):
-        safety_text = random.choice(safe_templates)
-        verdict = "Safe"
-    elif any(x in name_lower for x in ['sulfate', 'fragrance', 'parfum', 'alcohol']):
-        safety_text = random.choice(caution_templates)
-        verdict = "Moderate"
-    elif any(x in name_lower for x in ['paraben', 'retinol', 'triclosan', 'formaldehyde']):
-        safety_text = random.choice(unsafe_templates)
-        verdict = "Hazardous"
-    else:
-        safety_text = "requires more data for a definitive safety conclusion."
-        verdict = "Unknown"
+    try:
+        # 1. Exact or Fuzzy match the ingredient
+        cleaned_name = ingredient_name.strip().lower()
+        
+        # Try exact first
+        ingredient = db.query(Ingredient).filter(Ingredient.name.ilike(cleaned_name)).first()
+        
+        # Try fuzzy match if not found
+        if not ingredient:
+             all_ings = db.query(Ingredient).all()
+             name_map = {ing.name.lower(): ing for ing in all_ings}
+             matches = difflib.get_close_matches(cleaned_name, name_map.keys(), n=1, cutoff=0.7)
+             if matches:
+                 ingredient = name_map[matches[0]]
+                 
+        if not ingredient:
+             return f"## Analysis of **{ingredient_name}**\n\nNo detailed safety record was found for this ingredient in our current database."
 
-    # Context-aware content
-    audience_context = ""
-    if target_audience == "baby":
-        audience_context = f"\n\n### 👶 For Babies:\nSince this product is for **babies**, extra caution is advised. Their skin is thinner and more permeable. "
-        if verdict in ["Moderate", "Hazardous"]:
-            audience_context += f"**{ingredient_name}** is generally recommended to be avoided in baby products to prevent irritation or systemic absorption."
+        # 2. Extract and format the data
+        # Handle scores which might be JSON strings or empty
+        scores = {}
+        if ingredient.scores:
+            if isinstance(ingredient.scores, str):
+                try:
+                    scores = json.loads(ingredient.scores)
+                except json.JSONDecodeError:
+                    pass
+            elif isinstance(ingredient.scores, dict):
+                scores = ingredient.scores
+
+        # Determine Primary Verdict based on scores
+        # We assume ratings over 5 indicate higher concern based on the updated dataset
+        max_score = 0
+        if scores:
+             numeric_scores = [v for v in scores.values() if isinstance(v, (int, float))]
+             if numeric_scores:
+                 max_score = max(numeric_scores)
+                 
+        verdict = "Low Risk"
+        alert_icon = "✅"
+        if max_score >= 7 or ingredient.is_restricted:
+             verdict = "High Risk / Hazardous"
+             alert_icon = "🚨"
+        elif max_score >= 4:
+             verdict = "Moderate Risk"
+             alert_icon = "⚠️"
+
+        # Construct the context paragraphs
+        audience_context = ""
+        if target_audience == "baby":
+            audience_context = f"**For Babies:** Extra caution advised due to thinner, more permeable skin. "
+            if max_score >= 4:
+                audience_context += "Generally recommended to be avoided in baby products."
+            else:
+                 audience_context += "Likely safe, but patch testing is always recommended."
+                 
+        description_text = ingredient.description if ingredient.description else "A common cosmetic or cleansing ingredient."
+        concerns_text = ingredient.concerns if ingredient.concerns else "No major specific concerns listed."
+
+        # Regulation limits formatting
+        qty_context = f"### ⚖️ Regulatory Compliance\n"
+        limit_text = ingredient.max_percentage if ingredient.max_percentage else "No strict numerical limit specified."
+        source_text = ingredient.regulation_source if ingredient.regulation_source else ingredient.regulation
+        
+        qty_context += f"**Government Recommended Limit**: {limit_text}% (Source: {source_text})\n\n"
+        
+        if quantity and ingredient.max_percentage:
+             qty_context += f"**Your Product's Concentration**: **{quantity}%**\n"
+             if quantity > ingredient.max_percentage:
+                 qty_context += f"⚠️ **WARNING**: EXCEEDS safe limit by **{round(quantity - ingredient.max_percentage, 2)}%**.\n"
+             else:
+                  qty_context += f"✅ **SAFE**: Within allowable safety limits.\n"
+        elif quantity:
+             qty_context += f"**Your Product's Concentration**: **{quantity}%** (No strict upper limit found for direct comparison).\n"
+
+        # Detailed breakdown of specific hazard scores from the new dataset
+        hazard_details = "\n### 🧬 Specific Hazard Ratings (0-10)\n"
+        if scores:
+             for key, val in scores.items():
+                  # Format the key nicely
+                  formatted_key = str(key).replace('_', ' ').capitalize()
+                  hazard_details += f"* **{formatted_key}**: {val}\n"
         else:
-            audience_context += f"**{ingredient_name}** is likely gentle enough, but always patch test."
-            
-    elif target_audience == "adult":
-        audience_context = f"\n\n### 👤 For Adults:\nFor standard adult use, this ingredient is evaluated based on healthy skin tolerance. "
-        if verdict == "Hazardous":
-            audience_context += "However, considering the potential long-term effects, safer alternatives might be preferable."
+             hazard_details += "No specific granular hazard ratings available.\n"
+             
+        # Extraction of ALL missing fields from raw_data
+        extra_context = ""
+        if getattr(ingredient, 'raw_data', None):
+             try:
+                 raw = json.loads(ingredient.raw_data)
+                 meta = raw.get('ingredient_metadata', {})
+                 reg = raw.get('regulatory_guardrails', {})
+                 
+                 # Technical Identifiers
+                 cas = meta.get('cas_number')
+                 iid = meta.get('ingredient_id')
+                 if cas or iid:
+                     extra_context += "### 🔬 Technical Identifiers\n"
+                     if cas: extra_context += f"*   **CAS Number**: `{cas}`\n"
+                     if iid: extra_context += f"*   **Ingredient ID**: `{iid}`\n"
+                     extra_context += "\n"
+                     
+                 # Environmental & Ethics
+                 env = raw.get('environmental_impact', {})
+                 is_vegan = raw.get('is_vegan')
+                 certs = raw.get('certifications', [])
+                 
+                 if env or is_vegan is not None or certs:
+                     extra_context += "### 🌍 Environmental & Ethics\n"
+                     if is_vegan is not None:
+                         extra_context += f"*   **Vegan**: {'Yes ✅' if is_vegan else 'No ❌'}\n"
+                     if env and isinstance(env, dict):
+                         for k, v in env.items():
+                             extra_context += f"*   **{str(k).replace('_', ' ').capitalize()}**: {v}\n"
+                     if certs and isinstance(certs, list):
+                         extra_context += f"*   **Certifications**: {', '.join(certs)}\n"
+                     extra_context += "\n"
+                     
+                 # Full Government Limits
+                 gov_limits = reg.get('government_limits', [])
+                 if len(gov_limits) > 1: # We already showed the first one in qty_context
+                     extra_context += "### ⚖️ Additional Government Constraints\n"
+                     for gl in gov_limits[1:]: # Skip the first one
+                         if isinstance(gl, dict):
+                             auth = gl.get('authority', 'Unknown')
+                             limit = gl.get('max_allowable_percentage', 'N/A')
+                             n = gl.get('note', '')
+                             extra_context += f"*   **{auth}**: {limit} - {n}\n"
+                     extra_context += "\n"
+                     
+             except json.JSONDecodeError:
+                 pass
 
-    # Quantity content
-    # Mock some regulation limits for demo purposes
-    mock_limits = {
-        "retinol": 0.3,
-        "salicylic acid": 2.0,
-        "glycolic acid": 10.0,
-        "parabens": 0.4,
-        "phenoxyethanol": 1.0
-    }
-    
-    limit = mock_limits.get(name_lower, 1.0) # Default 1.0% if unknown
-    
-    qty_context = f"\n\n### ⚖️ Regulatory Compliance\n"
-    qty_context += f"**Government Recommended Limit**: Maximum **{limit}%** in leave-on products (based on EU Regulation 1223/2009).\n"
-    
-    if quantity:
-        qty_context += f"**Your Product's Concentration**: **{quantity}%**\n\n"
-        if quantity > limit:
-             qty_context += f"⚠️ **WARNING**: This concentration EXCEEDS the recommended safe limit by **{round(quantity - limit, 2)}%**.\n"
-             qty_context += f"\n**Potential Risks at this Level:**\n"
-             qty_context += f"*   **Severe Irritation**: High likelihood of redness, peeling, and burning sensation.\n"
-             qty_context += f"*   **Systemic Toxicity**: Potential for ingredient to be absorbed into the bloodstream.\n"
-             qty_context += f"*   **Allergic Sensitization**: Increased risk of developing a permanent allergy to this ingredient.\n"
-        else:
-             qty_context += f"✅ **SAFE**: This concentration is within the allowable safety limits.\n"
-    else:
-        qty_context += f"**Analysis**: Please check if your product label specifies a concentration. If it exceeds {limit}%, it may be unsafe."
+        # Green Alternatives Logic
+        green_context = ""
+        if getattr(ingredient, 'alternatives', None):
+             try:
+                 alts_data = json.loads(ingredient.alternatives)
+                 if alts_data and isinstance(alts_data, dict):
+                     suggestions = alts_data.get('suggestions', [])
+                     if suggestions:
+                         green_context += "## 🌱 Green Alternatives\n"
+                         green_context += f"*{alts_data.get('pivot_reason', 'Consider these safer options.')}*\n\n"
+                         for alt in suggestions:
+                             alt_name = alt.get('alt_name', 'Unknown Alternative')
+                             benefit = alt.get('benefit', '')
+                             green_context += f"*   **{alt_name}**: {benefit}\n"
+             except json.JSONDecodeError:
+                 pass
+             
+        # Aliases
+        alias_text = ""
+        if ingredient.common_names and ingredient.common_names.lower() != ingredient.name.lower():
+            alias_text = f"*(Also known as: {ingredient.common_names})*"
 
-    # Green Alternative Logic
-    green_alternatives = {
-        "retinol": {
-            "alt": "Bakuchiol",
-            "reason": "Plant-based, non-irritating, and biodegradable.",
-            "impact": "Lower carbon footprint in production."
-        },
-        "parabens": {
-            "alt": "Leuconostoc/Radish Root Ferment",
-            "reason": "Natural peptide preservative.",
-            "impact": "Non-toxic to marine life."
-        },
-        "sodium lauryl sulfate": {
-            "alt": "Coco-Glucoside",
-            "reason": "Derived from coconut and fruit sugars.",
-            "impact": "Fully biodegradable and mild."
-        },
-        "fragrance": {
-            "alt": "Essential Oils (Lavender/Chamomile)",
-            "reason": "Natural extraction.",
-            "impact": "Avoids synthetic VOC emissions."
-        },
-        "oxybenzone": {
-            "alt": "Zinc Oxide (Non-Nano)",
-            "reason": "Mineral blocker.",
-            "impact": "Reef-safe, does not bleach coral."
-        }
-    }
-    
-    green_context = ""
-    green_data = green_alternatives.get(name_lower)
-    
-    # We will return a special separator that the frontend can parse, or just append to markdown
-    # For this iteration, let's append a clearly marked section
-    
-    if green_data:
-        green_context = f"""
-## 🌱 Green Alternative: **{green_data['alt']}**
-*   **Why it's better**: {green_data['reason']}
-*   **Eco-Impact**: {green_data['impact']}
-*   **Recommendation**: Look for products containing {green_data['alt']} instead.
-"""
-    else:
-        green_context = f"""
-## 🌱 Green Alternative
-*   **Status**: No direct 1:1 natural substitute found in our database for *{ingredient_name}*.
-*   **Advice**: Reduce usage or look for "Clean Label" certifications.
-"""
+        # Final Markdown Response
+        response = f"""
+## Analysis of **{ingredient.name}**
+{alias_text}
 
-    # Final Markdown Response
-    response = f"""
-## Analysis of **{ingredient_name}**
-**Verdict**: {verdict}
+**Verdict**: {alert_icon} **{verdict}**
 
-**{ingredient_name}** {safety_text} It is commonly found in {category} products.
+### 📖 Overview
+**{ingredient.name}** is generally used as a {description_text}
+
+**Safety Summary:** {concerns_text}
 
 {audience_context}
-{qty_context}
 
+{qty_context}
+{hazard_details}
+
+{extra_context}
 {green_context}
 
 ---
-*Disclaimer: This is a generated summary for educational purposes.*
+*Data extracted securely from updated ingredient safety database.*
 """
-    return response.strip()
+        return response.strip()
+
+    except Exception as e:
+        print(f"Error fetching details for {ingredient_name}: {e}")
+        return f"## Analysis of **{ingredient_name}**\n\nAn error occurred while fetching details from the database."
+    finally:
+        db.close()

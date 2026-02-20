@@ -96,12 +96,22 @@ const IngredientBreakdown = ({ ingredients, category = "shampoo", targetAudience
 
                                 {/* Detailed Scores */}
                                 <div className="mt-2 flex flex-wrap gap-2">
-                                    {Object.entries(typeof scores === 'string' ? JSON.parse(scores) : scores).map(([key, value]) => (
-                                        <div key={key} className="text-xs bg-white/5 px-2 py-1 rounded border border-white/10">
-                                            <span className="text-gray-400 capitalize">{key.replace('_', ' ')}: </span>
-                                            <span className={`font-bold ${value > 0 ? 'text-white' : 'text-gray-500'}`}>{value}</span>
-                                        </div>
-                                    ))}
+                                    {(() => {
+                                        try {
+                                            const scoresObj = typeof scores === 'string' ? JSON.parse(scores) : scores;
+                                            return Object.entries(scoresObj).map(([key, value]) => {
+                                                if (typeof value !== 'number') return null;
+                                                return (
+                                                    <div key={key} className="text-xs bg-white/5 px-2 py-1 rounded border border-white/10">
+                                                        <span className="text-gray-400 capitalize">{key.replace(/_/g, ' ')}: </span>
+                                                        <span className={`font-bold ${value >= 7 ? 'text-danger' : value >= 4 ? 'text-warning' : 'text-primary'}`}>{value}</span>
+                                                    </div>
+                                                );
+                                            });
+                                        } catch (e) {
+                                            return null;
+                                        }
+                                    })()}
                                 </div>
 
                                 {ing.is_restricted && (
