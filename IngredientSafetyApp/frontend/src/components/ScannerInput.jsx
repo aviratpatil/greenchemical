@@ -72,7 +72,7 @@ const ScannerInput = ({ onAnalyze, isLoading }) => {
                         <textarea
                             value={text}
                             onChange={(e) => setText(e.target.value)}
-                            className="w-full h-40 bg-black/20 border border-white/10 rounded-xl p-4 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary resize-none transition-all"
+                            className="w-full h-40 bg-black/40 border border-white/10 rounded-xl p-4 text-white placeholder-gray-500 focus:outline-none focus:border-primary focus:shadow-[0_0_15px_var(--color-primary)] resize-none transition-all duration-300"
                             placeholder="Aqua, Sodium Lauryl Sulfate, Retinol 0.5%..."
                             disabled={isLoading}
                         />
@@ -95,7 +95,7 @@ const ScannerInput = ({ onAnalyze, isLoading }) => {
                 flex items-center gap-2 px-8 py-3 rounded-full font-semibold text-white transition-all transform
                 ${isLoading || !text.trim()
                                         ? 'bg-gray-700 cursor-not-allowed opacity-50'
-                                        : 'bg-gradient-to-r from-primary to-emerald-600 hover:scale-105 shadow-lg shadow-emerald-500/20'}
+                                        : 'bg-primary text-black hover:bg-white hover:scale-105 hover:shadow-[0_0_25px_var(--color-primary)] shadow-[0_0_15px_var(--color-primary)]'}
               `}
                             >
                                 {isLoading ? (

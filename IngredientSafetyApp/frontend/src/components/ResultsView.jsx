@@ -11,6 +11,7 @@ const ResultsView = ({ data, onReset }) => {
         overall_verdict,
         executive_summary,
         ingredients,
+        ingredients_breakdown,
         combination_alerts,
         regulatory_flags,
         // Fallbacks for old format if needed temporarily:
@@ -31,11 +32,11 @@ const ResultsView = ({ data, onReset }) => {
 
                 {/* Score Card */}
                 <div className="glass-card p-8 flex flex-col items-center justify-center">
-                    <SafetyGauge score={overall_safety_score} />
+                    <SafetyGauge score={overall_safety_score !== undefined ? overall_safety_score : fakeScore} />
                     <div className="mt-6 text-center">
-                        <h2 className="text-3xl font-bold text-white mb-2">{risk_level}</h2>
+                        <h2 className="text-3xl font-bold text-white mb-2">{risk_level || displayRisk}</h2>
                         <p className="text-gray-400">
-                            Based on {ingredients_breakdown.length} ingredients
+                            Based on {(ingredients || ingredients_breakdown || []).length} ingredients
                         </p>
                     </div>
                 </div>
@@ -79,14 +80,14 @@ const ResultsView = ({ data, onReset }) => {
 
             {/* NEW EXPERT UI: Combination Alerts */}
             {combination_alerts && combination_alerts.length > 0 && combination_alerts[0] !== "No significant interactions detected." && (
-                <div className="mb-6 bg-purple-900/20 border border-purple-500/30 p-5 rounded-xl">
-                    <h3 className="text-lg font-semibold text-purple-300 mb-3 flex items-center gap-2">
+                <div className="mb-6 bg-primary/10 border border-primary/30 shadow-[0_0_15px_var(--color-primary)] p-5 rounded-xl">
+                    <h3 className="text-lg font-semibold text-primary drop-shadow-[0_0_8px_var(--color-primary)] mb-3 flex items-center gap-2">
                         <RefreshCw size={18} className="animate-spin-slow" /> Chemistry Interaction Alerts
                     </h3>
                     <ul className="space-y-2">
                         {combination_alerts.map((alert, i) => (
                             <li key={i} className="text-sm text-gray-300 flex items-start gap-2">
-                                <span className="text-purple-400 mt-0.5">•</span>
+                                <span className="text-primary mt-0.5 drop-shadow-[0_0_5px_var(--color-primary)]">•</span>
                                 <span>{alert}</span>
                             </li>
                         ))}
@@ -96,14 +97,14 @@ const ResultsView = ({ data, onReset }) => {
 
             {/* NEW EXPERT UI: Regulatory Flags */}
             {regulatory_flags && regulatory_flags.length > 0 && regulatory_flags[0] !== "No mandatory regulatory flags triggered." && (
-                <div className="mb-8 bg-red-900/20 border border-red-500/30 p-5 rounded-xl">
-                    <h3 className="text-lg font-semibold text-red-400 mb-3 flex items-center gap-2">
+                <div className="mb-8 bg-danger/10 border border-danger/30 shadow-[0_0_15px_var(--color-danger)] p-5 rounded-xl">
+                    <h3 className="text-lg font-semibold text-danger drop-shadow-[0_0_8px_var(--color-danger)] mb-3 flex items-center gap-2">
                         <AlertTriangle size={18} /> Regulatory Warnings ({data.region})
                     </h3>
                     <ul className="space-y-2">
                         {regulatory_flags.map((flag, i) => (
                             <li key={i} className="text-sm text-gray-300 flex items-start gap-2">
-                                <span className="text-red-400 mt-0.5">•</span>
+                                <span className="text-danger mt-0.5 drop-shadow-[0_0_5px_var(--color-danger)]">•</span>
                                 <span className="leading-relaxed">{flag}</span>
                             </li>
                         ))}

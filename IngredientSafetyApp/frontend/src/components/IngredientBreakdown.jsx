@@ -42,7 +42,15 @@ const IngredientBreakdown = ({ ingredients, category = "shampoo", targetAudience
             <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
                 {ingredients.map((ing, idx) => {
                     // Calculate max score for color coding if not present
-                    const scores = ing.scores || { general: ing.hazard_score || 0 };
+                    const getScoreFromVerdict = (v) => {
+                        if (v === 'SAFE') return 1;
+                        if (v === 'CAUTION') return 5;
+                        if (v === 'FLAG') return 8;
+                        if (v === 'BANNED_IN_CONTEXT' || v === 'BANNED') return 10;
+                        return 0;
+                    };
+                    const fallbackScore = ing.verdict ? getScoreFromVerdict(ing.verdict) : 0;
+                    const scores = ing.scores || { general: ing.hazard_score !== undefined ? ing.hazard_score : fallbackScore };
                     let maxScore = 5;
                     // Handle scores being a string (JSON) or object
                     if (typeof scores === 'string') {
@@ -60,7 +68,7 @@ const IngredientBreakdown = ({ ingredients, category = "shampoo", targetAudience
                         <div
                             key={idx}
                             onClick={() => handleIngredientClick(ing)}
-                            className="flex items-start gap-4 p-3 rounded-lg hover:bg-white/10 transition-colors border border-transparent hover:border-purple-500/30 cursor-pointer group"
+                            className="flex items-start gap-4 p-3 rounded-lg hover:bg-white/5 transition-all duration-300 border border-transparent hover:border-primary/50 hover:shadow-[0_0_15px_var(--color-primary)] cursor-pointer group"
                         >
                             {/* Icon based on max score */}
                             <div className="mt-1">
@@ -75,7 +83,7 @@ const IngredientBreakdown = ({ ingredients, category = "shampoo", targetAudience
 
                             <div className="flex-1">
                                 <div className="flex justify-between items-start">
-                                    <h4 className="font-medium text-white group-hover:text-purple-300 transition-colors">{ing.name}</h4>
+                                    <h4 className="font-medium text-white group-hover:text-primary transition-colors">{ing.name}</h4>
                                     <span
                                         className={`text-xs px-2 py-1 rounded-full font-bold
                         ${maxScore >= 7 ? 'bg-danger/20 text-danger' :

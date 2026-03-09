@@ -8,15 +8,13 @@ import ResultsSkeleton from './components/ResultsSkeleton';
 import { analyzeIngredients } from './api';
 import { History } from 'lucide-react';
 
-import CategorySelection from './components/CategorySelection';
-
 function App() {
   const [results, setResults] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [history, setHistory] = useState([]);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [targetAudience, setTargetAudience] = useState(null); // 'adult' or 'baby'
+  const [targetAudience, setTargetAudience] = useState('adult'); // Default to adult
 
   useEffect(() => {
     const saved = localStorage.getItem('scanHistory');
@@ -58,17 +56,16 @@ function App() {
   };
 
   const handleChangeCategory = () => {
-    setTargetAudience(null);
     setResults(null);
     setError(null);
   }
 
   return (
     <Router>
-      <div className="min-h-screen bg-gradient-to-br from-dark to-slate-900 text-white p-4 md:p-8 font-sans">
+      <div className="min-h-screen bg-transparent text-white p-4 md:p-8 font-sans">
         <header className="max-w-7xl mx-auto mb-12 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity" onClick={handleChangeCategory}>
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-emerald-600 flex items-center justify-center font-bold text-lg text-white">
+            <div className="w-8 h-8 rounded-lg bg-primary shadow-[0_0_10px_var(--color-primary)] flex items-center justify-center font-bold text-lg text-black">
               IS
             </div>
             <h1 className="text-xl font-bold tracking-tight text-white">Ingredient Safety</h1>
@@ -100,18 +97,10 @@ function App() {
                   </div>
                 )}
 
-                {!targetAudience ? (
-                  <CategorySelection onSelect={setTargetAudience} />
-                ) : loading ? (
+                {loading ? (
                   <ResultsSkeleton />
                 ) : !results ? (
                   <div className="flex flex-col items-center">
-                    <button
-                      onClick={handleChangeCategory}
-                      className="mb-4 text-sm text-gray-400 hover:text-white transition-colors flex items-center gap-1"
-                    >
-                      ← Change Audience ({targetAudience === 'baby' ? 'For Baby' : 'For Adults'})
-                    </button>
                     <ScannerInput onAnalyze={handleAnalyze} isLoading={loading} />
                   </div>
                 ) : (
