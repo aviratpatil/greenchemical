@@ -6,7 +6,20 @@ import { RefreshCw, AlertTriangle, Printer } from 'lucide-react';
 import RecommendationsCard from './RecommendationsCard';
 
 const ResultsView = ({ data, onReset }) => {
-    const { overall_safety_score, risk_level, key_concerns, ingredients_breakdown, missing_ingredients, recommendations } = data;
+    // Handling both the old endpoint response (for safety) and the new endpoint
+    const {
+        overall_verdict,
+        executive_summary,
+        ingredients,
+        combination_alerts,
+        regulatory_flags,
+        // Fallbacks for old format if needed temporarily:
+        overall_safety_score, risk_level, key_concerns, missing_ingredients, recommendations
+    } = data;
+
+    // Convert string verdict to a number for the old gauge
+    const fakeScore = overall_verdict === 'GREEN' ? 90 : overall_verdict === 'YELLOW' ? 60 : 20;
+    const displayRisk = overall_verdict === 'GREEN' ? "SAFE" : overall_verdict === 'YELLOW' ? "CAUTION" : "WARNING";
 
     return (
         <motion.div
@@ -28,25 +41,31 @@ const ResultsView = ({ data, onReset }) => {
                 </div>
 
                 {/* Summary Card */}
-                <div className="glass-card p-8">
+                <div className="glass-card p-8 flex flex-col justify-center">
                     <h3 className="text-xl font-semibold mb-4 text-white">Analysis Summary</h3>
 
-                    {key_concerns && key_concerns.length > 0 ? (
-                        <div className="space-y-3">
-                            <p className="text-danger font-medium flex items-center gap-2">
-                                <AlertTriangle size={18} /> Key Concerns Detected:
-                            </p>
-                            <ul className="list-disc list-inside text-gray-300 space-y-1">
-                                {key_concerns.map((concern, i) => (
-                                    <li key={i}>{concern}</li>
-                                ))}
-                            </ul>
+                    {executive_summary ? (
+                        <div className="text-gray-300 leading-relaxed text-sm lg:text-base">
+                            {executive_summary}
                         </div>
                     ) : (
-                        <div className="h-full flex flex-col justify-center">
-                            <p className="text-primary font-medium mb-2">Clean Formulation</p>
-                            <p className="text-gray-400">We didn't detect any restricted or highly hazardous chemicals in this list based on our database.</p>
-                        </div>
+                        key_concerns && key_concerns.length > 0 ? (
+                            <div className="space-y-3">
+                                <p className="text-danger font-medium flex items-center gap-2">
+                                    <AlertTriangle size={18} /> Key Concerns Detected:
+                                </p>
+                                <ul className="list-disc list-inside text-gray-300 space-y-1">
+                                    {key_concerns.map((concern, i) => (
+                                        <li key={i}>{concern}</li>
+                                    ))}
+                                </ul>
+                            </div>
+                        ) : (
+                            <div className="h-full flex flex-col justify-center">
+                                <p className="text-primary font-medium mb-2">Clean Formulation</p>
+                                <p className="text-gray-400">We didn't detect any restricted or highly hazardous chemicals in this list based on our database.</p>
+                            </div>
+                        )
                     )}
                 </div>
             </div>
@@ -55,6 +74,40 @@ const ResultsView = ({ data, onReset }) => {
             {recommendations && recommendations.length > 0 && (
                 <div className="mb-8">
                     <RecommendationsCard recommendations={recommendations} />
+                </div>
+            )}
+
+            {/* NEW EXPERT UI: Combination Alerts */}
+            {combination_alerts && combination_alerts.length > 0 && combination_alerts[0] !== "No significant interactions detected." && (
+                <div className="mb-6 bg-purple-900/20 border border-purple-500/30 p-5 rounded-xl">
+                    <h3 className="text-lg font-semibold text-purple-300 mb-3 flex items-center gap-2">
+                        <RefreshCw size={18} className="animate-spin-slow" /> Chemistry Interaction Alerts
+                    </h3>
+                    <ul className="space-y-2">
+                        {combination_alerts.map((alert, i) => (
+                            <li key={i} className="text-sm text-gray-300 flex items-start gap-2">
+                                <span className="text-purple-400 mt-0.5">•</span>
+                                <span>{alert}</span>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            )}
+
+            {/* NEW EXPERT UI: Regulatory Flags */}
+            {regulatory_flags && regulatory_flags.length > 0 && regulatory_flags[0] !== "No mandatory regulatory flags triggered." && (
+                <div className="mb-8 bg-red-900/20 border border-red-500/30 p-5 rounded-xl">
+                    <h3 className="text-lg font-semibold text-red-400 mb-3 flex items-center gap-2">
+                        <AlertTriangle size={18} /> Regulatory Warnings ({data.region})
+                    </h3>
+                    <ul className="space-y-2">
+                        {regulatory_flags.map((flag, i) => (
+                            <li key={i} className="text-sm text-gray-300 flex items-start gap-2">
+                                <span className="text-red-400 mt-0.5">•</span>
+                                <span className="leading-relaxed">{flag}</span>
+                            </li>
+                        ))}
+                    </ul>
                 </div>
             )}
 
@@ -68,9 +121,9 @@ const ResultsView = ({ data, onReset }) => {
             )}
 
             <IngredientBreakdown
-                ingredients={ingredients_breakdown}
-                category={data.category}
-                targetAudience={data.target_audience}
+                ingredients={ingredients || ingredients_breakdown || []}
+                category={data.product_type || data.category}
+                targetAudience={data.target_group || data.target_audience}
             />
 
             <div className="mt-8 flex justify-center gap-4">

@@ -2,7 +2,7 @@ from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Dict
 
 from .database import SessionLocal
 from .services import analyze_ingredients_text
@@ -79,3 +79,37 @@ def analyze_details(request: IngredientRequest):
         request.quantity
     )
     return {"details": details}
+
+
+# ── Formulation-level expert analysis ──────────────────────────────────────
+
+class FormulationRequest(BaseModel):
+    ingredient_list: List[str]               # ordered INCI list
+    product_type: str = "shampoo"            # e.g. "shampoo", "face cream"
+    region: str = "EU"                       # "EU", "US", "both"
+    target_group: str = "general adult"      # e.g. "general adult", "children under 3"
+    known_concentrations: Optional[Dict[str, float]] = None  # {"phenoxyethanol": 0.8}
+
+@app.post("/analyze/formulation")
+def analyze_formulation(request: FormulationRequest):
+    """
+    Full formulation-level cosmetic safety analysis.
+    Returns overall_verdict, per-ingredient breakdown, combination alerts,
+    and regulatory flags based on the expert system prompt framework.
+    """
+    if not request.ingredient_list:
+        raise HTTPException(status_code=400, detail="ingredient_list cannot be empty.")
+
+    from app.formulation_analyzer import analyze_formulation as _analyze
+    try:
+        result = _analyze(
+            ingredient_list=request.ingredient_list,
+            product_type=request.product_type,
+            region=request.region,
+            target_group=request.target_group,
+            known_concentrations=request.known_concentrations or {},
+        )
+        return result
+    except Exception as e:
+        print(f"Formulation analysis error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
